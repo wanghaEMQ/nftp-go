@@ -1,0 +1,56 @@
+package main
+
+/*
+
+#cgo CFLAGS: -I../nftp-codec/src
+#cgo LDFLAGS: -L../nftp-codec/build -lnftp-codec -lhashtable -Wl,-rpath=../nftp-codec/build
+
+#include "nftp.h"
+#include <stdlib.h>
+
+*/
+import "C"
+
+import (
+	"bufio"
+	"fmt"
+	"net"
+	"os"
+	"strings"
+)
+
+func main() {
+	smoketest()
+
+	port := ":9999"
+
+	conn, e := net.Dial("tcp", port)
+	if e != nil {
+		fmt.Println(e)
+		return
+	}
+
+	for {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print(">> ")
+		fpath, _ := reader.ReadString('\n')
+
+		C.nftp_proto_maker()
+
+		fmt.Fprintf(conn, str+"\n")
+		msg, _ := bufio.NewReader(conn).ReadString('\n')
+		fmt.Println("-> " + msg)
+
+		if strings.TrimSpace(string(str)) == "STOP" {
+			fmt.Println("TCP client exiting...")
+			return
+		}
+	}
+}
+
+func smoketest() {
+	fmt.Println("-------------------------------")
+	// C Library
+	C.test()
+	fmt.Println("-------------------------------")
+}
