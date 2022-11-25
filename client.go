@@ -8,6 +8,12 @@ package main
 #include "nftp.h"
 #include <stdlib.h>
 
+int
+size2int(size_t sz)
+{
+	return (int) sz;
+}
+
 */
 import "C"
 
