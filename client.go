@@ -23,7 +23,14 @@ import (
 	"net"
 	"os"
 	"strings"
+	"unsafe"
 )
+
+const NFTP_TYPE_HELLO = 1
+const NFTP_TYPE_ACK = 2
+const NFTP_TYPE_FILE = 3
+const NFTP_TYPE_END = 4
+const NFTP_TYPE_GIVEME = 5
 
 func main() {
 	smoketest()
