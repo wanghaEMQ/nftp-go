@@ -46,9 +46,21 @@ func main() {
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print(">> ")
-		fpath, _ := reader.ReadString('\n')
+		_fpath, _ := reader.ReadString('\n')
 
-		C.nftp_proto_maker()
+		_fpath = _fpath[:len(_fpath)-1]
+		fpath := C.CString(_fpath)
+		defer C.free(unsafe.Pointer(fpath))
+
+		fmt.Println(_fpath)
+
+		var rmsg *C.uchar
+		var rlen C.ulong
+
+		C.nftp_proto_maker(fpath, NFTP_TYPE_HELLO, 0, 0, &rmsg, &rlen)
+
+		// str := C.GoString(rmsg)
+		str := string(charToBytes(rmsg, rlen))
 
 		fmt.Fprintf(conn, str+"\n")
 		msg, _ := bufio.NewReader(conn).ReadString('\n')
@@ -58,6 +70,7 @@ func main() {
 			fmt.Println("TCP client exiting...")
 			return
 		}
+		C.free(unsafe.Pointer(rmsg))
 	}
 }
 
