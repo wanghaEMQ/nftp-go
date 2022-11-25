@@ -67,3 +67,11 @@ func smoketest() {
 	C.test()
 	fmt.Println("-------------------------------")
 }
+
+func charToBytes(src *C.uchar, sz C.ulong) []byte {
+	size := C.size2int(sz)
+	s := make([]int, 1)
+	s[0] = int(size)
+	fmt.Println(s)
+	return C.GoBytes(unsafe.Pointer(src), size)
+}
