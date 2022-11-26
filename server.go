@@ -8,6 +8,24 @@ package main
 #include "nftp.h"
 #include <stdlib.h>
 
+int
+size2int(size_t sz)
+{
+	return (int) sz;
+}
+
+int
+nftp_proto_handler2(char *msg, size_t len, uint8_t **rmsg, size_t *rlen)
+{
+	return nftp_proto_handler(msg, len, rmsg, rlen);
+}
+
+int
+nftp_msg_type(char *msg)
+{
+	return (int) msg[0];
+}
+
 */
 import "C"
 
