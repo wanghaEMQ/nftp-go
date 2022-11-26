@@ -33,8 +33,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	"strings"
-	"time"
+	"unsafe"
 )
 
 func main() {
@@ -55,24 +54,44 @@ func main() {
 		fmt.Println(e)
 		return
 	}
+	// Init NFTP protocol.
+	C.nftp_proto_init()
 
 	for {
-		msg, e := bufio.NewReader(conn).ReadString('\n')
+		fmt.Println("@@")
+		_msg, e := bufio.NewReader(conn).ReadString('\n')
+		fmt.Println("@@")
+		_msg = _msg[:len(_msg)-1]
 		if e != nil {
 			fmt.Println(e)
 			return
 		}
 
-		if strings.TrimSpace(msg) == "STOP" {
-			fmt.Println("Exiting TCP server!")
-			return
-		}
+		var smsg *C.uchar
+		var slen C.ulong
 
-		fmt.Print("-> ", msg)
-		t := time.Now()
-		myTime := t.Format(time.RFC3339) + "\n"
-		conn.Write([]byte(myTime))
+		rmsg := C.CString(_msg)
+		rlen := C.ulong(len(_msg))
+		defer C.free(unsafe.Pointer(rmsg))
+
+		fmt.Println(rlen)
+		fmt.Println("-> ", _msg)
+
+		C.nftp_proto_handler2(rmsg, rlen, &smsg, &slen)
+		defer C.free(unsafe.Pointer(smsg))
+
+		if C.nftp_msg_type(rmsg) == NFTP_TYPE_HELLO {
+			smsgb := charToBytes(smsg, slen)
+			conn.Write(append(smsgb, byte('\n')))
+		} else if C.nftp_msg_type(rmsg) == NFTP_TYPE_ACK {
+			fmt.Println("Receive ACK msg. Skip.")
+		} else if C.nftp_msg_type(rmsg) == NFTP_TYPE_END {
+			fmt.Println("Received file.")
+			break
+		}
 	}
+
+	C.nftp_proto_fini()
 }
 
 func smoketest() {
