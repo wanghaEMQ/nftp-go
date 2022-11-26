@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strings"
 	"unsafe"
 )
 
@@ -43,12 +42,14 @@ func main() {
 		return
 	}
 
+	C.nftp_proto_init()
+
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print(">> ")
 		_fpath, _ := reader.ReadString('\n')
-
 		_fpath = _fpath[:len(_fpath)-1]
+
 		fpath := C.CString(_fpath)
 		defer C.free(unsafe.Pointer(fpath))
 
@@ -58,20 +59,21 @@ func main() {
 		var rlen C.ulong
 
 		C.nftp_proto_maker(fpath, NFTP_TYPE_HELLO, 0, 0, &rmsg, &rlen)
+		defer C.free(unsafe.Pointer(rmsg))
 
-		// str := C.GoString(rmsg)
-		str := string(charToBytes(rmsg, rlen))
-
-		fmt.Fprintf(conn, str+"\n")
-		msg, _ := bufio.NewReader(conn).ReadString('\n')
-		fmt.Println("-> " + msg)
-
-		if strings.TrimSpace(string(str)) == "STOP" {
-			fmt.Println("TCP client exiting...")
+		rmsgb := charToBytes(rmsg, rlen)
+		_, e := conn.Write(append(rmsgb, byte('\n')))
+		if e != nil {
+			fmt.Println("Error in sending")
 			return
 		}
-		C.free(unsafe.Pointer(rmsg))
+		fmt.Println("done")
+
+		msg, _ := bufio.NewReader(conn).ReadString('\n')
+		fmt.Println("-> " + msg)
 	}
+
+	C.nftp_proto_fini()
 }
 
 func smoketest() {
