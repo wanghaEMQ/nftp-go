@@ -14,6 +14,27 @@ size2int(size_t sz)
 	return (int) sz;
 }
 
+int
+nftp_proto_handler2(char *msg, size_t len, uint8_t **rmsg, size_t *rlen)
+{
+	return nftp_proto_handler(msg, len, rmsg, rlen);
+}
+
+int
+nftp_proto_maker2(char *fpath, int type, uint8_t key, int n, uint8_t **rmsg, size_t *rlen)
+{
+	return nftp_proto_maker(fpath, type, key, n, rmsg, rlen);
+}
+
+int
+nftp_file_blocks2(char *fpath)
+{
+	size_t sz;
+	if (nftp_file_blocks(fpath, &sz) != 0)
+		return 0;
+	return (int) sz;
+}
+
 */
 import "C"
 
@@ -85,8 +106,6 @@ func smoketest() {
 
 func charToBytes(src *C.uchar, sz C.ulong) []byte {
 	size := C.size2int(sz)
-	s := make([]int, 1)
-	s[0] = int(size)
-	fmt.Println(s)
+	fmt.Println(int(size))
 	return C.GoBytes(unsafe.Pointer(src), size)
 }
