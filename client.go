@@ -90,8 +90,31 @@ func main() {
 		}
 		fmt.Println("done")
 
-		msg, _ := bufio.NewReader(conn).ReadString('\n')
-		fmt.Println("-> " + msg)
+		amsg, _ := bufio.NewReader(conn).ReadString('\n')
+		fmt.Println("-> " + amsg)
+		fmt.Println("Get ACK")
+
+		blocks := int(C.nftp_file_blocks2(fpath))
+		fmt.Print("Blocks:")
+		fmt.Println(blocks)
+		for i := 0; i < blocks; i++ {
+			var fmsg *C.uchar
+			var flen C.ulong
+
+			C.nftp_proto_maker2(fpath, NFTP_TYPE_FILE, 0, C.int(i), &fmsg, &flen)
+			defer C.free(unsafe.Pointer(fmsg))
+
+			fmsgb := charToBytes(fmsg, flen)
+			_, e := conn.Write(append(fmsgb, byte('\n')))
+			if e != nil {
+				fmt.Println("Error in sending")
+				return
+			}
+			fmt.Print(i + 1)
+			fmt.Print("/")
+			fmt.Println(blocks)
+		}
+		fmt.Println("Done")
 	}
 
 	C.nftp_proto_fini()
