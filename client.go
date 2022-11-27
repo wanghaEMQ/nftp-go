@@ -127,6 +127,33 @@ func smoketest() {
 
 func charToBytes(src *C.uchar, sz C.ulong) []byte {
 	size := C.size2int(sz)
-	fmt.Println(int(size))
 	return C.GoBytes(unsafe.Pointer(src), size)
+}
+
+func ReadNftpMsg(conn net.Conn) string {
+	buf := make([]byte, 5)
+
+	fmt.Println("here")
+	reader := bufio.NewReader(conn)
+	_, e := reader.Read(buf)
+	if e != nil {
+		fmt.Println(e)
+		return string("")
+	}
+
+	l := int(buf[1]<<24) + int(buf[2]<<16) + int(buf[3]<<8) + int(buf[4])
+	fmt.Println(l)
+
+	bufb := make([]byte, l-5)
+
+	_, e = reader.Read(bufb)
+	if e != nil {
+		fmt.Println(e)
+		return string("")
+	}
+	fmt.Println("here2")
+
+	buf = append(buf, bufb...)
+
+	return string(buf)
 }
