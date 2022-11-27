@@ -2,8 +2,8 @@ package main
 
 /*
 
-#cgo CFLAGS: -I../nftp-codec/src
-#cgo LDFLAGS: -L../nftp-codec/build -lnftp-codec -lhashtable -Wl,-rpath=../nftp-codec/build
+#cgo CFLAGS: -I../../nftp-codec/src
+#cgo LDFLAGS: -L../../nftp-codec/build -lnftp-codec -lhashtable -Wl,-rpath=../../nftp-codec/build
 
 #include "nftp.h"
 #include <stdlib.h>
@@ -12,12 +12,6 @@ int
 size2int(size_t sz)
 {
 	return (int) sz;
-}
-
-int
-nftp_proto_handler2(char *msg, size_t len, uint8_t **rmsg, size_t *rlen)
-{
-	return nftp_proto_handler(msg, len, rmsg, rlen);
 }
 
 int
@@ -42,18 +36,13 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"nftp-go/misc"
 	"os"
 	"unsafe"
 )
 
-const NFTP_TYPE_HELLO = 1
-const NFTP_TYPE_ACK = 2
-const NFTP_TYPE_FILE = 3
-const NFTP_TYPE_END = 4
-const NFTP_TYPE_GIVEME = 5
-
 func main() {
-	smoketest()
+	misc.Smoketest()
 
 	port := ":9999"
 
@@ -79,10 +68,10 @@ func main() {
 		var rmsg *C.uchar
 		var rlen C.ulong
 
-		C.nftp_proto_maker(fpath, NFTP_TYPE_HELLO, 0, 0, &rmsg, &rlen)
+		C.nftp_proto_maker(fpath, misc.NFTP_TYPE_HELLO, 0, 0, &rmsg, &rlen)
 		defer C.free(unsafe.Pointer(rmsg))
 
-		rmsgb := charToBytes(rmsg, rlen)
+		rmsgb := CharToBytes(rmsg, rlen)
 		_, e := conn.Write(rmsgb)
 		if e != nil {
 			fmt.Println("Error in sending")
@@ -90,7 +79,12 @@ func main() {
 		}
 
 		fmt.Println("Waiting for ACK ->")
-		amsg := ReadNftpMsg(conn)
+		amsg, e := misc.ReadNftpMsg(conn)
+		if e != nil {
+			fmt.Println(e)
+			break
+		}
+
 		fmt.Println("Go on", amsg)
 
 		blocks := int(C.nftp_file_blocks2(fpath))
@@ -100,10 +94,10 @@ func main() {
 			var fmsg *C.uchar
 			var flen C.ulong
 
-			C.nftp_proto_maker2(fpath, NFTP_TYPE_FILE, 0, C.int(i), &fmsg, &flen)
+			C.nftp_proto_maker2(fpath, misc.NFTP_TYPE_FILE, 0, C.int(i), &fmsg, &flen)
 			defer C.free(unsafe.Pointer(fmsg))
 
-			fmsgb := charToBytes(fmsg, flen)
+			fmsgb := CharToBytes(fmsg, flen)
 			_, e := conn.Write(fmsgb)
 			if e != nil {
 				fmt.Println("Error in sending")
@@ -118,42 +112,8 @@ func main() {
 	C.nftp_proto_fini()
 }
 
-func smoketest() {
-	fmt.Println("-------------------------------")
-	// C Library
-	C.test()
-	fmt.Println("-------------------------------")
-}
-
-func charToBytes(src *C.uchar, sz C.ulong) []byte {
+func CharToBytes(src *C.uchar, sz C.ulong) []byte {
 	size := C.size2int(sz)
 	return C.GoBytes(unsafe.Pointer(src), size)
 }
 
-func ReadNftpMsg(conn net.Conn) string {
-	buf := make([]byte, 5)
-
-	fmt.Println("here")
-	reader := bufio.NewReader(conn)
-	_, e := reader.Read(buf)
-	if e != nil {
-		fmt.Println(e)
-		return string("")
-	}
-
-	l := int(buf[1]<<24) + int(buf[2]<<16) + int(buf[3]<<8) + int(buf[4])
-	fmt.Println(l)
-
-	bufb := make([]byte, l-5)
-
-	_, e = reader.Read(bufb)
-	if e != nil {
-		fmt.Println(e)
-		return string("")
-	}
-	fmt.Println("here2")
-
-	buf = append(buf, bufb...)
-
-	return string(buf)
-}
