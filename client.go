@@ -83,16 +83,15 @@ func main() {
 		defer C.free(unsafe.Pointer(rmsg))
 
 		rmsgb := charToBytes(rmsg, rlen)
-		_, e := conn.Write(append(rmsgb, byte('\n')))
+		_, e := conn.Write(rmsgb)
 		if e != nil {
 			fmt.Println("Error in sending")
 			return
 		}
-		fmt.Println("done")
 
-		amsg, _ := bufio.NewReader(conn).ReadString('\n')
-		fmt.Println("-> " + amsg)
-		fmt.Println("Get ACK")
+		fmt.Println("Waiting for ACK ->")
+		amsg := ReadNftpMsg(conn)
+		fmt.Println("Go on", amsg)
 
 		blocks := int(C.nftp_file_blocks2(fpath))
 		fmt.Print("Blocks:")
@@ -105,16 +104,15 @@ func main() {
 			defer C.free(unsafe.Pointer(fmsg))
 
 			fmsgb := charToBytes(fmsg, flen)
-			_, e := conn.Write(append(fmsgb, byte('\n')))
+			_, e := conn.Write(fmsgb)
 			if e != nil {
 				fmt.Println("Error in sending")
 				return
 			}
-			fmt.Print(i + 1)
-			fmt.Print("/")
-			fmt.Println(blocks)
+
+			fmt.Println(i+1, "/", blocks)
 		}
-		fmt.Println("Done")
+		fmt.Println(_fpath, "has Done.")
 	}
 
 	C.nftp_proto_fini()
