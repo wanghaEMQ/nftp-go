@@ -30,8 +30,8 @@ nftp_msg_type(char *msg)
 import "C"
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"unsafe"
 )
@@ -71,9 +71,12 @@ func main() {
 
 	for {
 		fmt.Println("@@")
-		_msg := ReadNftpMsg(conn)
+		_msg, e := ReadNftpMsg(conn)
+		if e != nil {
+			fmt.Println(e)
+			break
+		}
 		fmt.Println("@@")
-		_msg = _msg[:len(_msg)-1]
 
 		var smsg *C.uchar
 		var slen C.ulong
@@ -82,20 +85,20 @@ func main() {
 		rlen := C.ulong(len(_msg))
 		defer C.free(unsafe.Pointer(rmsg))
 
-		fmt.Println(rlen)
-		fmt.Println("-> ", _msg)
+		fmt.Println("-> ", rlen, "msg")
 
 		C.nftp_proto_handler2(rmsg, rlen, &smsg, &slen)
 		defer C.free(unsafe.Pointer(smsg))
 
-		if C.nftp_msg_type(rmsg) == NFTP_TYPE_HELLO {
-			smsgb := charToBytes(smsg, slen)
-			conn.Write(append(smsgb, byte('\n')))
-		} else if C.nftp_msg_type(rmsg) == NFTP_TYPE_ACK {
+		switch tp := C.nftp_msg_type(rmsg); tp {
+		case NFTP_TYPE_HELLO:
+			conn.Write(charToBytes(smsg, slen))
+			fmt.Println("Receive Hello msg and Reply ACK.")
+		case NFTP_TYPE_ACK:
 			fmt.Println("Receive ACK msg. Skip.")
-		} else if C.nftp_msg_type(rmsg) == NFTP_TYPE_END {
+		case NFTP_TYPE_END:
 			fmt.Println("Received file.")
-			break
+		default:
 		}
 	}
 
@@ -111,36 +114,38 @@ func smoketest() {
 
 func charToBytes(src *C.uchar, sz C.ulong) []byte {
 	size := C.size2int(sz)
-	s := make([]int, 1)
-	s[0] = int(size)
-	fmt.Println(s)
 	return C.GoBytes(unsafe.Pointer(src), size)
 }
 
-func ReadNftpMsg(conn net.Conn) string {
+func ReadNftpMsg(conn net.Conn) (string, error) {
 	buf := make([]byte, 5)
 
-	fmt.Println("here")
-	reader := bufio.NewReader(conn)
-	_, e := reader.Read(buf)
+	_, e := io.ReadFull(conn, buf)
 	if e != nil {
-		fmt.Println(e)
-		return string("")
+		return string(""), e
 	}
 
-	l := int(buf[1]<<24) + int(buf[2]<<16) + int(buf[3]<<8) + int(buf[4])
-	fmt.Println(l)
+	l := toInt(buf[1:])
 
 	bufb := make([]byte, l-5)
 
-	_, e = reader.Read(bufb)
+	_, e = io.ReadFull(conn, bufb)
 	if e != nil {
-		fmt.Println(e)
-		return string("")
+		return string(""), e
 	}
-	fmt.Println("here2")
 
 	buf = append(buf, bufb...)
 
-	return string(buf)
+	return string(buf), nil
+}
+
+func toInt(bytes []byte) int {
+	result := 0
+	for i := 0; i < 4; i++ {
+		result = result << 8
+		result += int(bytes[i])
+
+	}
+
+	return result
 }
