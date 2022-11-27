@@ -47,13 +47,11 @@ func main() {
 
 	port := ":9999"
 	listener, e := net.Listen("tcp", port)
-
+	defer listener.Close()
 	if e != nil {
 		fmt.Println(e)
 		return
 	}
-
-	defer listener.Close()
 
 	conn, e := listener.Accept()
 	if e != nil {
@@ -69,30 +67,52 @@ func main() {
 	C.nftp_set_recvdir(recvdir)
 	defer C.free(unsafe.Pointer(recvdir))
 
+	rch := make(chan []byte, 8)
+	sch := make(chan []byte, 8)
+
+	go handle_nftp_msg(rch, sch)
+	go reply(sch, conn)
+
 	for {
 		fmt.Println("@@")
-		_msg, e := ReadNftpMsg(conn)
+		msg, e := ReadNftpMsg(conn)
 		if e != nil {
 			fmt.Println(e)
 			break
 		}
 		fmt.Println("@@")
 
+		rch <- msg
+	}
+
+	C.nftp_proto_fini()
+}
+
+func reply(sch chan []byte, conn net.Conn) {
+	for {
+		smsg := <-sch
+		conn.Write(smsg)
+	}
+}
+
+func handle_nftp_msg(rch chan []byte, sch chan []byte) {
+	for {
+		_rmsg := <-rch
+
+		rmsg := C.CString(string(_rmsg))
+		rlen := C.ulong(len(_rmsg))
+		defer C.free(unsafe.Pointer(rmsg))
+		fmt.Println("-> ", rlen, "msg")
+
 		var smsg *C.uchar
 		var slen C.ulong
-
-		rmsg := C.CString(_msg)
-		rlen := C.ulong(len(_msg))
-		defer C.free(unsafe.Pointer(rmsg))
-
-		fmt.Println("-> ", rlen, "msg")
 
 		C.nftp_proto_handler2(rmsg, rlen, &smsg, &slen)
 		defer C.free(unsafe.Pointer(smsg))
 
 		switch tp := C.nftp_msg_type(rmsg); tp {
 		case NFTP_TYPE_HELLO:
-			conn.Write(charToBytes(smsg, slen))
+			sch <- charToBytes(smsg, slen)
 			fmt.Println("Receive Hello msg and Reply ACK.")
 		case NFTP_TYPE_ACK:
 			fmt.Println("Receive ACK msg. Skip.")
@@ -101,8 +121,6 @@ func main() {
 		default:
 		}
 	}
-
-	C.nftp_proto_fini()
 }
 
 func smoketest() {
@@ -117,12 +135,12 @@ func charToBytes(src *C.uchar, sz C.ulong) []byte {
 	return C.GoBytes(unsafe.Pointer(src), size)
 }
 
-func ReadNftpMsg(conn net.Conn) (string, error) {
+func ReadNftpMsg(conn net.Conn) ([]byte, error) {
 	buf := make([]byte, 5)
 
 	_, e := io.ReadFull(conn, buf)
 	if e != nil {
-		return string(""), e
+		return buf, e
 	}
 
 	l := toInt(buf[1:])
@@ -131,12 +149,12 @@ func ReadNftpMsg(conn net.Conn) (string, error) {
 
 	_, e = io.ReadFull(conn, bufb)
 	if e != nil {
-		return string(""), e
+		return bufb, e
 	}
 
 	buf = append(buf, bufb...)
 
-	return string(buf), nil
+	return buf, nil
 }
 
 func toInt(bytes []byte) int {
