@@ -60,8 +60,14 @@ func main() {
 		fmt.Println(e)
 		return
 	}
+
 	// Init NFTP protocol.
 	C.nftp_proto_init()
+
+	// Set recvdir
+	recvdir := C.CString("./")
+	C.nftp_set_recvdir(recvdir)
+	defer C.free(unsafe.Pointer(recvdir))
 
 	for {
 		fmt.Println("@@")
