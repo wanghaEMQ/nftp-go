@@ -1,2 +1,2 @@
 all:
-	go build -o client client.go && go build -o server server.go
+	mkdir -p build && go build -o build/client client.go && go build -o build/server server.go
