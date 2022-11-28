@@ -1,4 +1,4 @@
-package misc
+package nftp
 
 /*
 #cgo CFLAGS: -I../../nftp-codec/src
