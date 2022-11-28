@@ -2,23 +2,11 @@ package main
 
 /*
 
-#cgo CFLAGS: -I../../nftp-codec/src
-#cgo LDFLAGS: -L../../nftp-codec/build -lnftp-codec -lhashtable -Wl,-rpath=../../nftp-codec/build
+#cgo CFLAGS: -I../nftp/
+#cgo LDFLAGS: -L../nftp -lnftp-codec -lhashtable -Wl,-rpath=../nftp
 
-#include "nftp.h"
+#include <nftp.h>
 #include <stdlib.h>
-
-int
-size2int(size_t sz)
-{
-	return (int) sz;
-}
-
-int
-nftp_proto_handler2(char *msg, size_t len, uint8_t **rmsg, size_t *rlen)
-{
-	return nftp_proto_handler(msg, len, rmsg, rlen);
-}
 
 int
 nftp_msg_type(char *msg)
@@ -32,12 +20,12 @@ import "C"
 import (
 	"fmt"
 	"net"
-	"nftp-go/misc"
+	"nftp-go/nftp"
 	"unsafe"
 )
 
 func main() {
-	misc.Smoketest()
+	nftp.Smoketest()
 
 	port := ":9999"
 	listener, e := net.Listen("tcp", port)
@@ -69,7 +57,7 @@ func main() {
 
 	for {
 		fmt.Println("@@")
-		msg, e := misc.ReadNftpMsg(conn)
+		msg, e := nftp.ReadNftpMsg(conn)
 		if e != nil {
 			fmt.Println(e)
 			break
@@ -94,31 +82,25 @@ func handle_nftp_msg(rch chan []byte, sch chan []byte) {
 		_rmsg := <-rch
 
 		rmsg := C.CString(string(_rmsg))
-		rlen := C.ulong(len(_rmsg))
+		rlen := C.int(len(_rmsg))
 		defer C.free(unsafe.Pointer(rmsg))
 		fmt.Println("-> ", rlen, "msg")
 
-		var smsg *C.uchar
-		var slen C.ulong
+		var smsg *C.char
+		var slen C.int
 
-		C.nftp_proto_handler2(rmsg, rlen, &smsg, &slen)
+		C.nftp_proto_handler(rmsg, rlen, &smsg, &slen)
 		defer C.free(unsafe.Pointer(smsg))
 
 		switch tp := C.nftp_msg_type(rmsg); tp {
-		case misc.NFTP_TYPE_HELLO:
-			sch <- CharToBytes(smsg, slen)
+		case nftp.NFTP_TYPE_HELLO:
+			sch <- C.GoBytes(unsafe.Pointer(smsg), slen)
 			fmt.Println("Receive Hello msg and Reply ACK.")
-		case misc.NFTP_TYPE_ACK:
+		case nftp.NFTP_TYPE_ACK:
 			fmt.Println("Receive ACK msg. Skip.")
-		case misc.NFTP_TYPE_END:
+		case nftp.NFTP_TYPE_END:
 			fmt.Println("Received file.")
 		default:
 		}
 	}
 }
-
-func CharToBytes(src *C.uchar, sz C.ulong) []byte {
-	size := C.size2int(sz)
-	return C.GoBytes(unsafe.Pointer(src), size)
-}
-

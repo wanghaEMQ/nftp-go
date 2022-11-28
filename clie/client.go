@@ -2,23 +2,11 @@ package main
 
 /*
 
-#cgo CFLAGS: -I../../nftp-codec/src
-#cgo LDFLAGS: -L../../nftp-codec/build -lnftp-codec -lhashtable -Wl,-rpath=../../nftp-codec/build
+#cgo CFLAGS: -I../nftp/
+#cgo LDFLAGS: -L../nftp -lnftp-codec -lhashtable -Wl,-rpath=../nftp
 
-#include "nftp.h"
+#include <nftp.h>
 #include <stdlib.h>
-
-int
-size2int(size_t sz)
-{
-	return (int) sz;
-}
-
-int
-nftp_proto_maker2(char *fpath, int type, uint8_t key, int n, uint8_t **rmsg, size_t *rlen)
-{
-	return nftp_proto_maker(fpath, type, key, n, rmsg, rlen);
-}
 
 int
 nftp_file_blocks2(char *fpath)
@@ -36,13 +24,13 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	"nftp-go/misc"
+	"nftp-go/nftp"
 	"os"
 	"unsafe"
 )
 
 func main() {
-	misc.Smoketest()
+	nftp.Smoketest()
 
 	port := ":9999"
 
@@ -65,21 +53,20 @@ func main() {
 
 		fmt.Println(_fpath)
 
-		var rmsg *C.uchar
-		var rlen C.ulong
+		var rmsg *C.char
+		var rlen C.int
 
-		C.nftp_proto_maker(fpath, misc.NFTP_TYPE_HELLO, 0, 0, &rmsg, &rlen)
+		C.nftp_proto_maker(fpath, nftp.NFTP_TYPE_HELLO, 0, 0, &rmsg, &rlen)
 		defer C.free(unsafe.Pointer(rmsg))
 
-		rmsgb := CharToBytes(rmsg, rlen)
-		_, e := conn.Write(rmsgb)
+		_, e := conn.Write(C.GoBytes(unsafe.Pointer(rmsg), rlen))
 		if e != nil {
 			fmt.Println("Error in sending")
 			return
 		}
 
 		fmt.Println("Waiting for ACK ->")
-		amsg, e := misc.ReadNftpMsg(conn)
+		amsg, e := nftp.ReadNftpMsg(conn)
 		if e != nil {
 			fmt.Println(e)
 			break
@@ -91,14 +78,13 @@ func main() {
 		fmt.Print("Blocks:")
 		fmt.Println(blocks)
 		for i := 0; i < blocks; i++ {
-			var fmsg *C.uchar
-			var flen C.ulong
+			var fmsg *C.char
+			var flen C.int
 
-			C.nftp_proto_maker2(fpath, misc.NFTP_TYPE_FILE, 0, C.int(i), &fmsg, &flen)
+			C.nftp_proto_maker(fpath, nftp.NFTP_TYPE_FILE, 0, C.int(i), &fmsg, &flen)
 			defer C.free(unsafe.Pointer(fmsg))
 
-			fmsgb := CharToBytes(fmsg, flen)
-			_, e := conn.Write(fmsgb)
+			_, e := conn.Write(C.GoBytes(unsafe.Pointer(fmsg), flen))
 			if e != nil {
 				fmt.Println("Error in sending")
 				return
@@ -110,10 +96,5 @@ func main() {
 	}
 
 	C.nftp_proto_fini()
-}
-
-func CharToBytes(src *C.uchar, sz C.ulong) []byte {
-	size := C.size2int(sz)
-	return C.GoBytes(unsafe.Pointer(src), size)
 }
 
