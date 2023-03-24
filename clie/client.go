@@ -9,6 +9,12 @@ package main
 #include <stdlib.h>
 
 int
+nftp_msg_type(char *msg)
+{
+	return (int) msg[0];
+}
+
+int
 nftp_file_blocks2(char *fpath)
 {
 	size_t sz;
@@ -27,6 +33,7 @@ import (
 	"nftp-go/nftp"
 	"os"
 	"unsafe"
+	"math/rand"
 )
 
 func main() {
@@ -44,7 +51,7 @@ func main() {
 
 	for {
 		reader := bufio.NewReader(os.Stdin)
-		fmt.Print(">> ")
+		fmt.Print("/path/to/file=>> ")
 		_fpath, _ := reader.ReadString('\n')
 		_fpath = _fpath[:len(_fpath)-1]
 
@@ -88,10 +95,9 @@ func main() {
 			C.nftp_proto_maker(fpath, nftp.NFTP_TYPE_FILE, 0, C.int(i), &fmsg, &flen)
 			defer C.free(unsafe.Pointer(fmsg))
 
-			_, e := conn.Write(C.GoBytes(unsafe.Pointer(fmsg), flen))
-			if e != nil {
-				fmt.Println("Error in sending")
-				return
+			// Simulate unstable network
+			if rand.Int()%100 < 20 {
+				continue
 			}
 
 			fmt.Println(i+1, "/", blocks)
