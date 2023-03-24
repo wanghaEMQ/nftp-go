@@ -47,6 +47,12 @@ func main() {
 		return
 	}
 
+	sch := make(chan []byte, 8)
+	ack := make(chan []byte, 8)
+
+	go sender(sch, conn)
+	go handle_giveme(ack, sch, conn)
+
 	C.nftp_proto_init()
 
 	for {
@@ -77,11 +83,7 @@ func main() {
 		}
 
 		fmt.Println("Waiting for ACK ->")
-		amsg, e := nftp.ReadNftpMsg(conn)
-		if e != nil {
-			fmt.Println(e)
-			break
-		}
+		amsg := <- ack
 
 		fmt.Println("Go on", amsg)
 
@@ -92,7 +94,11 @@ func main() {
 			var fmsg *C.char
 			var flen C.int
 
-			C.nftp_proto_maker(fpath, nftp.NFTP_TYPE_FILE, 0, C.int(i), &fmsg, &flen)
+			if i == blocks-1 {
+				C.nftp_proto_maker(fpath, nftp.NFTP_TYPE_END, 0, C.int(i), &fmsg, &flen)
+			} else {
+				C.nftp_proto_maker(fpath, nftp.NFTP_TYPE_FILE, 0, C.int(i), &fmsg, &flen)
+			}
 			defer C.free(unsafe.Pointer(fmsg))
 
 			// Simulate unstable network
@@ -100,11 +106,56 @@ func main() {
 				continue
 			}
 
+			sch <- C.GoBytes(unsafe.Pointer(fmsg), flen)
+
 			fmt.Println(i+1, "/", blocks)
 		}
 		fmt.Println(_fpath, "has Done.")
 	}
 
 	C.nftp_proto_fini()
+}
+
+func handle_giveme(ack chan []byte, sch chan []byte, conn net.Conn) {
+	for {
+		_rmsg, e := nftp.ReadNftpMsg(conn)
+		if e != nil {
+			fmt.Println(e)
+			break
+		}
+
+		rmsg := C.CString(string(_rmsg))
+		rlen := C.int(len(_rmsg))
+		defer C.free(unsafe.Pointer(rmsg))
+
+		if C.nftp_msg_type(rmsg) == nftp.NFTP_TYPE_ACK {
+			ack <- _rmsg
+			continue
+		}
+		if C.nftp_msg_type(rmsg) != nftp.NFTP_TYPE_GIVEME {
+			fmt.Println("NOT GIVEME???", C.nftp_msg_type(rmsg))
+			continue
+		}
+
+		// Reply FILE/END packet
+		var smsg *C.char
+		var slen C.int
+
+		C.nftp_proto_handler(rmsg, rlen, &smsg, &slen)
+		defer C.free(unsafe.Pointer(smsg))
+
+		sch <- C.GoBytes(unsafe.Pointer(smsg), slen)
+	}
+}
+
+func sender(sch chan []byte, conn net.Conn) {
+	for {
+		smsg := <- sch
+		_, e := conn.Write(smsg)
+		if e != nil {
+			fmt.Println("Error in sending")
+			return
+		}
+	}
 }
 
