@@ -22,7 +22,11 @@ import (
 	"net"
 	"nftp-go/nftp"
 	"unsafe"
+	"time"
 )
+
+var fname_curr *C.char
+var flen_curr  C.int
 
 func main() {
 	nftp.Smoketest()
@@ -52,17 +56,18 @@ func main() {
 	rch := make(chan []byte, 8)
 	sch := make(chan []byte, 8)
 
+	fname_curr = nil
+
 	go handle_nftp_msg(rch, sch)
 	go reply(sch, conn)
+	go ask_nextid(sch)
 
 	for {
-		fmt.Println("@@")
 		msg, e := nftp.ReadNftpMsg(conn)
 		if e != nil {
 			fmt.Println(e)
 			break
 		}
-		fmt.Println("@@")
 
 		rch <- msg
 	}
@@ -73,7 +78,11 @@ func main() {
 func reply(sch chan []byte, conn net.Conn) {
 	for {
 		smsg := <-sch
-		conn.Write(smsg)
+		_, e := conn.Write(smsg)
+		if e != nil {
+			fmt.Println("Error in sending")
+			return
+		}
 	}
 }
 
@@ -94,6 +103,8 @@ func handle_nftp_msg(rch chan []byte, sch chan []byte) {
 
 		switch tp := C.nftp_msg_type(rmsg); tp {
 		case nftp.NFTP_TYPE_HELLO:
+			C.nftp_proto_hello_get_fname(rmsg, rlen, &fname_curr, &flen_curr)
+			fmt.Println("fname ", fname_curr)
 			sch <- C.GoBytes(unsafe.Pointer(smsg), slen)
 			fmt.Println("Receive Hello msg and Reply ACK.")
 		case nftp.NFTP_TYPE_ACK:
@@ -104,3 +115,29 @@ func handle_nftp_msg(rch chan []byte, sch chan []byte) {
 		}
 	}
 }
+
+func ask_nextid(sch chan []byte) {
+	for {
+		time.Sleep(1000 * time.Millisecond)
+		if fname_curr == nil {
+			continue
+		}
+		var blocks C.int
+		var nextid C.int
+		C.nftp_proto_recv_status(fname_curr, &blocks, &nextid)
+
+		if nextid == C.int(0) {
+			// No more giveme needed
+			fname_curr = nil
+			continue
+		}
+		fmt.Println(fname_curr, "Ask nextid", nextid)
+
+		var fmsg *C.char
+		var flen C.int
+		C.nftp_proto_maker(fname_curr, nftp.NFTP_TYPE_GIVEME, 0, nextid, &fmsg, &flen)
+
+		sch <- C.GoBytes(unsafe.Pointer(fmsg), flen)
+	}
+}
+
