@@ -3,7 +3,7 @@ package main
 /*
 
 #cgo CFLAGS: -I../nftp/
-#cgo LDFLAGS: -L../nftp -lnftp-codec -lhashtable -Wl,-rpath=../nftp
+#cgo LDFLAGS: -L../nftp -lnftp-codec-static -Wl,-rpath,../nftp
 
 #include <nftp.h>
 #include <stdlib.h>

@@ -1,8 +1,7 @@
 package nftp
 
 /*
-#cgo CFLAGS: -I../../nftp-codec/src
-#cgo LDFLAGS: -L../../nftp-codec/build -lnftp-codec -lhashtable -Wl,-rpath=../../nftp-codec/build
+#cgo LDFLAGS: -lnftp-codec-static
 
 #include "nftp.h"
 #include <stdlib.h>
