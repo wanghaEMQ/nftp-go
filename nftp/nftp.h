@@ -26,8 +26,9 @@
 
 #define NFTP_SIZE         32
 #define NFTP_BLOCK_SZ     (32 * 1024) // Maximal size of single package
-#define NFTP_FILES        128 // Receive up to 32 files at once
-#define NFTP_HASH(p, n)   nftp_djb_hashn(p, n)
+#define NFTP_BLOCK_NUM    (0xFFFF) // Maximal number of blocks
+#define NFTP_FILES        32 // Receive up to 32 files at once
+#define NFTP_HASH(p, n)   nftp_crc32c(p, n)
 #define NFTP_FNAME_LEN    64
 #define NFTP_FDIR_LEN     256
 
@@ -121,7 +122,9 @@ typedef struct _iter {
 
 uint32_t nftp_djb_hashn(const uint8_t *, size_t);
 uint32_t nftp_fnv1a_hashn(const uint8_t *, size_t);
-uint8_t  nftp_crc(uint8_t *, size_t);
+uint8_t  nftp_crc(const uint8_t *, size_t);
+uint32_t nftp_crc32(const uint8_t *, size_t);
+uint32_t nftp_crc32c(const uint8_t *, size_t);
 
 char * nftp_file_bname(char *);
 char * nftp_file_path(char *);
@@ -158,8 +161,8 @@ int nftp_vec_pop(nftp_vec *, void **, int);
 int nftp_vec_get(nftp_vec *, int, void **);
 int nftp_vec_getidx(nftp_vec *, void *, int*);
 int nftp_vec_cat(nftp_vec *, nftp_vec *);
-size_t nftp_vec_cap(nftp_vec *);
-size_t nftp_vec_len(nftp_vec *);
+int nftp_vec_cap(nftp_vec *);
+int nftp_vec_len(nftp_vec *);
 // Iterator
 nftp_iter * nftp_vec_iter(nftp_vec *);
 
@@ -214,6 +217,8 @@ int nftp_proto_init();
 int nftp_proto_fini();
 int nftp_proto_send_start(char *);
 int nftp_proto_send_stop(char *);
+int nftp_proto_recv_status(char *, int *, int *);
+int nftp_proto_hello_get_fname(char *, int, char **, int *);
 
 /*
  * This function is to create a NFTP msg quickly.
