@@ -56,8 +56,12 @@ func main() {
 		var rmsg *C.char
 		var rlen C.int
 
-		C.nftp_proto_maker(fpath, nftp.NFTP_TYPE_HELLO, 0, 0, &rmsg, &rlen)
+		rv := C.nftp_proto_maker(fpath, nftp.NFTP_TYPE_HELLO, 0, 0, &rmsg, &rlen)
 		defer C.free(unsafe.Pointer(rmsg))
+
+		if rv != 0 {
+			continue
+		}
 
 		_, e := conn.Write(C.GoBytes(unsafe.Pointer(rmsg), rlen))
 		if e != nil {
