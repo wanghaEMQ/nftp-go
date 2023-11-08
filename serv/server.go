@@ -7,6 +7,9 @@ package main
 
 #include <nftp.h>
 #include <stdlib.h>
+#include <string.h>
+
+void set_file_done_cb(char *fname);
 
 int
 nftp_msg_type(char *msg)
@@ -14,6 +17,21 @@ nftp_msg_type(char *msg)
 	return (int) msg[0];
 }
 
+int
+file_done_cb(void *fname)
+{
+	char * fn = fname;
+	printf("file (%s) is done \n", fn);
+	set_file_done_cb(fn);
+	free(fn);
+}
+
+void
+set_file_done_cb(char *fname)
+{
+	char *fn = strdup(fname);
+	nftp_proto_register(fn, file_done_cb, fn);
+}
 */
 import "C"
 
@@ -52,6 +70,11 @@ func main() {
 	recvdir := C.CString("./")
 	C.nftp_set_recvdir(recvdir)
 	defer C.free(unsafe.Pointer(recvdir))
+
+	// Set cb for a special file name 'test'
+	luckfname := C.CString("test")
+	C.set_file_done_cb(luckfname);
+	defer C.free(unsafe.Pointer(luckfname))
 
 	rch := make(chan []byte, 8)
 	sch := make(chan []byte, 8)
