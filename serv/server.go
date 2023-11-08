@@ -12,6 +12,26 @@ package main
 void set_file_done_cb(char *fname);
 
 int
+cclog(char *m)
+{
+	printf("============ fname: %s(%d)\n", m, strlen(m));
+}
+
+char *
+xstrndup(char *m, int len)
+{
+	return strndup(m, len);
+}
+
+void
+nftp_proto_recv_status2(char *fname, int len, int *blkp, int *nidp)
+{
+	char *buf = strndup(fname, len);
+	nftp_proto_recv_status(buf, blkp, nidp);
+	free(buf);
+}
+
+int
 nftp_msg_type(char *msg)
 {
 	return (int) msg[0];
@@ -127,7 +147,9 @@ func handle_nftp_msg(rch chan []byte, sch chan []byte) {
 		switch tp := C.nftp_msg_type(rmsg); tp {
 		case nftp.NFTP_TYPE_HELLO:
 			C.nftp_proto_hello_get_fname(rmsg, rlen, &fname_curr, &flen_curr)
-			fmt.Println("fname ", fname_curr)
+			// fmt.Println("fname ", fname_curr)
+			fname_curr = C.xstrndup(fname_curr, flen_curr);
+			C.cclog(fname_curr);
 			sch <- C.GoBytes(unsafe.Pointer(smsg), slen)
 			fmt.Println("Receive Hello msg and Reply ACK.")
 		case nftp.NFTP_TYPE_ACK:
@@ -141,19 +163,20 @@ func handle_nftp_msg(rch chan []byte, sch chan []byte) {
 
 func ask_nextid(sch chan []byte) {
 	for {
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		if fname_curr == nil {
 			continue
 		}
 		var blocks C.int
 		var nextid C.int
-		C.nftp_proto_recv_status(fname_curr, &blocks, &nextid)
+		C.nftp_proto_recv_status2(fname_curr, flen_curr, &blocks, &nextid)
 
-		if nextid == C.int(0) {
+		if nextid < C.int(0) || nextid >= blocks {
 			// No more giveme needed
 			fname_curr = nil
 			continue
 		}
+		C.cclog(fname_curr);
 		fmt.Println(fname_curr, "Ask nextid", nextid)
 
 		var fmsg *C.char
