@@ -51,6 +51,8 @@ enum NFTP_ERR {
 	NFTP_ERR_STREAM,
 	NFTP_ERR_HT,
 	NFTP_ERR_TYPE,
+	NFTP_ERR_FILEWR,
+	NFTP_ERR_FILERD,
 };
 
 enum NFTP_SCHEMA {
@@ -129,8 +131,9 @@ uint32_t nftp_crc32c(const uint8_t *, size_t);
 char * nftp_file_bname(char *);
 char * nftp_file_path(char *);
 
+int nftp_file_remove(char *);
 int nftp_file_exist(char *);
-int nftp_file_newname(char *, char **);
+int nftp_file_newname(char *, char **, char *);
 int nftp_file_rename(char *, char *);
 int nftp_file_size(char *, size_t *);
 int nftp_file_blocks(char *, size_t *);
@@ -151,7 +154,7 @@ nftp_iter * nftp_iter_prev(nftp_iter *);
 
 typedef struct _vec nftp_vec;
 
-int nftp_vec_alloc(nftp_vec **);
+int nftp_vec_alloc(nftp_vec **, int);
 int nftp_vec_free(nftp_vec *);
 int nftp_vec_append(nftp_vec *, void *);
 int nftp_vec_insert(nftp_vec *, void *, int);
@@ -160,7 +163,6 @@ int nftp_vec_push(nftp_vec *, void *, int);
 int nftp_vec_pop(nftp_vec *, void **, int);
 int nftp_vec_get(nftp_vec *, int, void **);
 int nftp_vec_getidx(nftp_vec *, void *, int*);
-int nftp_vec_cat(nftp_vec *, nftp_vec *);
 int nftp_vec_cap(nftp_vec *);
 int nftp_vec_len(nftp_vec *);
 // Iterator
@@ -218,6 +220,7 @@ int nftp_proto_fini();
 int nftp_proto_send_start(char *);
 int nftp_proto_send_stop(char *);
 int nftp_proto_recv_status(char *, int *, int *);
+int nftp_proto_recv_stop(char *);
 int nftp_proto_hello_get_fname(char *, int, char **, int *);
 
 /*
