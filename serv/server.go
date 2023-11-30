@@ -155,7 +155,8 @@ func handle_nftp_msg(rch chan []byte, sch chan []byte) {
 		case nftp.NFTP_TYPE_ACK:
 			fmt.Println("Receive ACK msg. Skip.")
 		case nftp.NFTP_TYPE_END:
-			fmt.Println("Received file.")
+			fmt.Println("Received file. (written filename):")
+			C.cclog(smsg);
 		default:
 		}
 	}
